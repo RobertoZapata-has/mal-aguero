@@ -171,6 +171,28 @@ input{background:var(--tinta);border:1px solid var(--linea);color:var(--hueso);p
 .ojo{width:72px;height:36px;border-radius:50%;border:2px solid var(--brasa);position:relative}
 .ojo::after{content:"";position:absolute;inset:8px 26px;border-radius:50%;background:var(--brasa)}
 .toast{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--cw)*1.4 + 96px);z-index:40;background:var(--hueso);color:var(--noche);padding:8px 14px;border-radius:20px;font-size:14px;line-height:1.3;width:max-content;max-width:88%;text-align:center;box-shadow:0 6px 16px rgba(0,0,0,.5)}
+/* ---------- Logo ---------- */
+.portada-tit{margin:0;line-height:0}
+.logo{display:block;width:min(100%,420px);height:auto}
+.intro-logo{display:block;width:min(86vw,440px);height:auto}
+.btn.chico{font-size:15px;padding:8px 10px}
+.iconbtn.apagado{opacity:.5}
+
+/* ---------- Sustos ---------- */
+.susto{position:fixed;inset:0;z-index:300;overflow:hidden;background:rgba(0,0,0,0);transition:background .25s;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.susto.oscuro{background:rgba(0,0,0,.72)}
+.susto.negro{background:rgba(0,0,0,.92);transition:background .5s}
+.susto.tenue{background:rgba(0,0,0,.4)}
+.susto img{position:fixed;pointer-events:none;max-width:none;will-change:transform,opacity;transform-origin:50% 50%}
+.susto svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.susto .cierre{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 #000}
+.susto .humo{position:fixed;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(160,150,140,.45),transparent 70%);pointer-events:none}
+.susto .robada{position:fixed;width:6px;height:13px;border-radius:1px;background:var(--brasa);box-shadow:0 -2px 8px rgba(227,154,67,.8)}
+.mesa.sin-luz .velita::before{opacity:0;transition:opacity .2s}
+.mesa.sin-luz::after{background:radial-gradient(ellipse at 50% 60%,transparent 20%,rgba(0,0,0,.9) 100%)}
+.temblor{animation:temblor .45s linear}
+@keyframes temblor{10%{transform:translate(-9px,4px) rotate(-1deg)}20%{transform:translate(8px,-6px)}30%{transform:translate(-7px,-3px) rotate(1deg)}40%{transform:translate(6px,5px)}55%{transform:translate(-4px,2px)}70%{transform:translate(3px,-2px)}85%{transform:translate(-1px,1px)}}
+
 /* ---------- Inicio ---------- */
 .intro{position:fixed;inset:0;z-index:200;background:var(--noche);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;overflow:hidden;cursor:pointer;animation:introFuera .7s 3.4s ease forwards}
 .intro.salir{animation:introFuera .35s ease forwards}
@@ -203,7 +225,7 @@ input{background:var(--tinta);border:1px solid var(--linea);color:var(--hueso);p
 <div id="intro" class="intro" role="presentation">
   <div class="intro-luz"></div>
   <div class="intro-vela"></div>
-  <h1 class="intro-tit">Mal Agüero</h1>
+  <h1 class="intro-tit"><img class="intro-logo" src="marca/logo.webp" alt="Mal Agüero" width="900" height="400"></h1>
   <p class="intro-sub sub">Leyendas de terror de la Argentina</p>
   <div class="intro-cartas"><div class="dorso"></div><div class="dorso"></div><div class="dorso"></div></div>
   <span class="intro-saltar">Tocá para entrar</span>
@@ -271,6 +293,234 @@ const DORSO = '<div class="dorso"></div>';
 
 let S = null, uidSeq = 1, ocupado = false, botCorriendo = false, drag = null, toastT = null;
 
+const PREF = (()=>{ const p={sonido:true,sustos:true}; try{ Object.assign(p, JSON.parse(localStorage.getItem("ma-pref")||"{}")); }catch(_){} return p; })();
+function guardarPref(){ try{ localStorage.setItem("ma-pref", JSON.stringify(PREF)); }catch(_){} }
+const ICON_SON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>';
+const ICON_MUDO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>';
+
+/* ---------- sonido generado por código ---------- */
+const Sonido = (()=>{
+  let ctx=null, master=null, ruidoBuf=null, amb=null;
+  function iniciar(){
+    if(ctx){ if(ctx.state==="suspended") ctx.resume().catch(()=>{}); return; }
+    const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
+    ctx=new AC(); master=ctx.createGain(); master.gain.value=PREF.sonido?.9:0; master.connect(ctx.destination);
+    const len=ctx.sampleRate*2; ruidoBuf=ctx.createBuffer(1,len,ctx.sampleRate);
+    const d=ruidoBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+  }
+  const listo=()=>ctx && PREF.sonido && ctx.state!=="closed";
+  function env(g,t,a,pico,dec){ g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(pico,t+a); g.gain.exponentialRampToValueAtTime(.0001,t+a+dec); }
+  function ruido(t,dur,{tipo="bandpass",f=1000,f2=null,q=1,pico=.5,a=.005,dest=master}={}){
+    const s=ctx.createBufferSource(); s.buffer=ruidoBuf; s.loop=true;
+    const fl=ctx.createBiquadFilter(); fl.type=tipo; fl.frequency.setValueAtTime(f,t); if(f2) fl.frequency.exponentialRampToValueAtTime(f2,t+dur); fl.Q.value=q;
+    const g=ctx.createGain(); env(g,t,a,pico,dur); s.connect(fl).connect(g).connect(dest);
+    s.start(t,Math.random()); s.stop(t+a+dur+.05);
+  }
+  function tono(t,dur,{tipo="sine",f=440,f2=null,pico=.3,a=.005,filtro=null,dest=master}={}){
+    const o=ctx.createOscillator(); o.type=tipo; o.frequency.setValueAtTime(f,t); if(f2) o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    const g=ctx.createGain(); env(g,t,a,pico,dur); let n=o;
+    if(filtro){ const fl=ctx.createBiquadFilter(); fl.type="lowpass"; fl.frequency.value=filtro; o.connect(fl); n=fl; }
+    n.connect(g).connect(dest); o.start(t); o.stop(t+a+dur+.05); return o;
+  }
+  function vibrato(o,t,dur,hz,prof){ const v=ctx.createOscillator(); v.frequency.value=hz; const vg=ctx.createGain(); vg.gain.value=prof; v.connect(vg).connect(o.frequency); v.start(t); v.stop(t+dur+.1); }
+  const SON={
+    tick(){ const t=ctx.currentTime; ruido(t,.03,{f:3500,q:2,pico:.12}); },
+    deslizar(){ const t=ctx.currentTime; ruido(t,.16,{tipo:"highpass",f:2500,f2:5500,pico:.1,a:.04}); },
+    carta(){ const t=ctx.currentTime; tono(t,.12,{f:150,f2:60,pico:.45}); ruido(t,.05,{f:2200,q:.8,pico:.3}); },
+    repartir(n=5){ const t=ctx.currentTime; for(let i=0;i<n;i++) ruido(t+i*.08,.06,{f:3000,q:1.2,pico:.16}); },
+    sello(){ const t=ctx.currentTime; tono(t,.25,{f:110,f2:45,pico:.7}); ruido(t,.12,{tipo:"lowpass",f:900,pico:.45}); },
+    vela(i=0){ const t=ctx.currentTime+i*.17; ruido(t,.32,{f:700,f2:280,q:.6,pico:.22,a:.06}); },
+    premio(){ const t=ctx.currentTime; [523,659,784].forEach((f,i)=>tono(t+i*.09,.35,{tipo:"triangle",f,pico:.12})); },
+    zarpazo(){ const t=ctx.currentTime; for(let i=0;i<3;i++) ruido(t+i*.07,.13,{f:4200,f2:700,q:1.4,pico:.6,a:.004}); },
+    grunido(dur=.9,f=72){
+      const t=ctx.currentTime, o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(f,t); o.frequency.linearRampToValueAtTime(f*.78,t+dur);
+      const fl=ctx.createBiquadFilter(); fl.type="lowpass"; fl.frequency.value=520;
+      const am=ctx.createGain(); am.gain.value=.5; const lfo=ctx.createOscillator(); lfo.frequency.value=23; const lg=ctx.createGain(); lg.gain.value=.5; lfo.connect(lg).connect(am.gain);
+      const g=ctx.createGain(); env(g,t,.08,.85,dur); o.connect(fl).connect(am).connect(g).connect(master);
+      o.start(t); lfo.start(t); o.stop(t+dur+.2); lfo.stop(t+dur+.2);
+      ruido(t,dur,{tipo:"lowpass",f:420,pico:.22,a:.06});
+    },
+    cadenas(){ const t=ctx.currentTime; for(let i=0;i<10;i++){ const tt=t+i*.045+Math.random()*.02; tono(tt,.12,{tipo:"triangle",f:2400+Math.random()*2600,pico:.1}); tono(tt,.07,{tipo:"square",f:3800+Math.random()*1500,pico:.035}); } },
+    rebuzno(){ const t=ctx.currentTime; for(let k=0;k<2;k++){ const b=t+k*.62; tono(b,.24,{tipo:"sawtooth",f:560,f2:500,pico:.32,a:.03,filtro:1700}); tono(b+.26,.32,{tipo:"sawtooth",f:270,f2:210,pico:.36,a:.03,filtro:1100}); } },
+    herradura(){ const t=ctx.currentTime; tono(t,.32,{f:90,f2:38,pico:.95}); ruido(t,.1,{tipo:"lowpass",f:700,pico:.5}); ruido(t+.06,1.2,{tipo:"highpass",f:4200,pico:.16,a:.03}); },
+    silbido(){ const t=ctx.currentTime; const o=tono(t,.8,{f:1500,f2:2350,pico:.15,a:.06}); vibrato(o,t,.8,7,40); },
+    yasi(){ const t=ctx.currentTime; for(let k=0;k<2;k++){ const b=t+k*.75; tono(b,.18,{f:1850,f2:2450,pico:.16}); tono(b+.24,.16,{f:2450,f2:2050,pico:.15}); tono(b+.44,.22,{f:2100,f2:1800,pico:.13}); } },
+    hojas(){ const t=ctx.currentTime; for(let i=0;i<7;i++) ruido(t+i*.055,.08,{f:5200,q:.7,pico:.12}); },
+    agua(){ const t=ctx.currentTime; ruido(t,1.2,{tipo:"lowpass",f:650,f2:180,pico:.35,a:.12}); for(let i=0;i<12;i++) tono(t+Math.random()*1.1,.05,{f:240+Math.random()*320,f2:520+Math.random()*420,pico:.1}); },
+    lamento(){
+      const t=ctx.currentTime; ruido(t,.45,{f:300,f2:2600,q:.8,pico:.3,a:.3});
+      const t2=t+.45, o=ctx.createOscillator(); o.type="sawtooth"; o.frequency.setValueAtTime(950,t2); o.frequency.exponentialRampToValueAtTime(330,t2+1.1);
+      vibrato(o,t2,1.2,6,28);
+      const f1=ctx.createBiquadFilter(); f1.type="bandpass"; f1.frequency.value=1150; f1.Q.value=4;
+      const g=ctx.createGain(); env(g,t2,.03,.5,1.1); o.connect(f1).connect(g).connect(master); o.start(t2); o.stop(t2+1.3);
+      ruido(t2,1.1,{f:2100,q:1,pico:.14});
+    },
+    susurro(){ const t=ctx.currentTime; for(let i=0;i<5;i++) ruido(t+i*.2,.24,{f:1700+Math.random()*1400,q:3,pico:.1,a:.08}); tono(t,1.2,{f:180,f2:150,pico:.04,a:.3}); }
+  };
+  function play(n,...a){ try{ iniciar(); if(listo() && SON[n]) SON[n](...a); }catch(_){} }
+  function ambienteOn(){
+    try{
+      if(!listo() || amb) return;
+      const t=ctx.currentTime, g=ctx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.05,t+2.5); g.connect(master);
+      const s=ctx.createBufferSource(); s.buffer=ruidoBuf; s.loop=true;
+      const fl=ctx.createBiquadFilter(); fl.type="lowpass"; fl.frequency.value=380;
+      const lfo=ctx.createOscillator(); lfo.frequency.value=.07; const lg=ctx.createGain(); lg.gain.value=200; lfo.connect(lg).connect(fl.frequency);
+      s.connect(fl).connect(g); s.start(); lfo.start();
+      const grillo=setInterval(()=>{ if(!listo()) return; const t=ctx.currentTime; for(let i=0;i<3;i++) tono(t+i*.07,.03,{f:4300,pico:.018}); },2600);
+      amb={g,s,lfo,grillo};
+    }catch(_){}
+  }
+  function ambienteOff(){
+    if(!amb) return; const a=amb; amb=null; clearInterval(a.grillo);
+    try{ const t=ctx.currentTime; a.g.gain.cancelScheduledValues(t); a.g.gain.setValueAtTime(Math.max(a.g.gain.value,.0001),t); a.g.gain.exponentialRampToValueAtTime(.0001,t+.6); }catch(_){}
+    setTimeout(()=>{ try{ a.s.stop(); a.lfo.stop(); }catch(_){} },800);
+  }
+  function setOn(on){ PREF.sonido=on; guardarPref(); if(master) master.gain.value=on?.9:0; if(!on) ambienteOff(); }
+  return {iniciar,play,ambienteOn,ambienteOff,setOn};
+})();
+document.addEventListener("pointerdown",()=>{ Sonido.iniciar(); if(S && S.vista==="juego") Sonido.ambienteOn(); },{passive:true,capture:true});
+function vibrar(p){ try{ if(PREF.sustos && navigator.vibrate) navigator.vibrate(p); }catch(_){} }
+
+/* ---------- sustos ---------- */
+const FAMILIA={lobizon:"garra",uturunco:"garra",ucumar:"garra",familiar:"garra",mulanima:"herradura",cuero:"cuero",pombero:"pombero",yasi:"yasi",viuda:"viuda"};
+const FIGURA=new Set(["lobizon","uturunco","mulanima","cuero","pombero","yasi","viuda"]);
+function debeAsustar(){
+  const r=S.res; if(!PREF.sustos || !r || r.tipo==="bien" || r.dano<=0) return false;
+  return S.modo==="dos" || r.def===0;
+}
+function imgSusto(ov,src,css){ const im=new Image(); im.src=src; im.alt=""; Object.assign(im.style,css); ov.appendChild(im); return im; }
+function temblar(){ const j=$(".juego"); if(!j) return; j.classList.remove("temblor"); void j.offsetWidth; j.classList.add("temblor"); }
+function zarpazos(ov,demora=0){
+  const W=innerWidth,H=innerHeight, ns="http://www.w3.org/2000/svg";
+  const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`); ov.appendChild(svg);
+  const defs=document.createElementNS(ns,"defs"); svg.appendChild(defs);
+  for(let i=0;i<3;i++){
+    const x0=W*.8+i*W*.1-W*.12, y0=H*.16+i*10, x1=W*.12+i*W*.1, y1=H*.8+i*14, cx=(x0+x1)/2+W*.12, cy=(y0+y1)/2-H*.05;
+    const P=t=>({x:(1-t)*(1-t)*x0+2*(1-t)*t*cx+t*t*x1, y:(1-t)*(1-t)*y0+2*(1-t)*t*cy+t*t*y1});
+    const N=40, izq=[], der=[], ancho=Math.min(W,H)*.045;
+    for(let k=0;k<=N;k++){
+      const t=k/N, p=P(t), q=P(Math.min(1,t+.01)), dx=q.x-p.x, dy=q.y-p.y, L=Math.hypot(dx,dy)||1;
+      const w=Math.sin(Math.PI*t)**.8*ancho*(1+(Math.random()-.5)*.35);
+      izq.push(`${(p.x-dy/L*w).toFixed(1)},${(p.y+dx/L*w).toFixed(1)}`); der.unshift(`${(p.x+dy/L*w*.6).toFixed(1)},${(p.y-dx/L*w*.6).toFixed(1)}`);
+    }
+    const curva=`M${x0},${y0} Q${cx},${cy} ${x1},${y1}`;
+    const m=document.createElementNS(ns,"mask"); m.id="zm"+i+Date.now(); m.setAttribute("maskUnits","userSpaceOnUse");
+    const mp=document.createElementNS(ns,"path"); mp.setAttribute("d",curva); mp.setAttribute("stroke","#fff"); mp.setAttribute("stroke-width",ancho*4); mp.setAttribute("fill","none"); mp.setAttribute("stroke-linecap","round");
+    m.appendChild(mp); defs.appendChild(m);
+    const g=document.createElementNS(ns,"g"); g.setAttribute("mask",`url(#${m.id})`);
+    const sombra=document.createElementNS(ns,"polygon"); sombra.setAttribute("points",izq.concat(der).join(" ")); sombra.setAttribute("fill","rgba(0,0,0,.55)"); sombra.setAttribute("transform","translate(4 6)");
+    const herida=document.createElementNS(ns,"polygon"); herida.setAttribute("points",izq.concat(der).join(" ")); herida.setAttribute("fill","#3d0d0a"); herida.setAttribute("stroke","#7a1d16"); herida.setAttribute("stroke-width","2");
+    const brillo=document.createElementNS(ns,"path"); brillo.setAttribute("d",curva); brillo.setAttribute("stroke","#b5352b"); brillo.setAttribute("stroke-width",Math.max(2,ancho*.22)); brillo.setAttribute("fill","none"); brillo.setAttribute("stroke-linecap","round");
+    g.append(sombra,herida,brillo); svg.appendChild(g);
+    const L=mp.getTotalLength(); mp.style.strokeDasharray=L; mp.style.strokeDashoffset=L;
+    mp.animate([{strokeDashoffset:L},{strokeDashoffset:0}],{duration:reduce?1:110,delay:demora+i*55,easing:"ease-in",fill:"forwards"});
+  }
+  svg.animate([{opacity:1},{opacity:0}],{duration:700,delay:demora+1000,fill:"forwards"});
+}
+function abalanzar(ov,src,cr,{escala=1.25,dur=420}={}){
+  const w0=cr.width, im=imgSusto(ov,src,{left:cr.left+"px",top:cr.top+"px",width:w0+"px",height:"auto"});
+  const W=Math.min(innerWidth*escala,760), s=W/w0;
+  const dx=innerWidth/2-(cr.left+w0/2), dy=innerHeight*.42-(cr.top+cr.height/2);
+  im.animate([{transform:"translate(0,0) scale(1) rotate(-6deg)",opacity:.5},{transform:`translate(${dx}px,${dy}px) scale(${s}) rotate(3deg)`,opacity:1,offset:.8},{transform:`translate(${dx}px,${dy}px) scale(${s*1.06}) rotate(0deg)`,opacity:1}],{duration:dur,easing:"cubic-bezier(.55,0,.85,.45)",fill:"forwards"});
+  im.animate([{opacity:1},{opacity:0}],{duration:450,delay:dur+380,fill:"forwards"});
+  return im;
+}
+function manoFantasma(ov,demora=0){
+  const w=Math.min(innerWidth*.62,320);
+  const im=imgSusto(ov,"sustos/mano.webp",{left:(innerWidth-w)/2+(Math.random()-.5)*innerWidth*.2+"px",top:innerHeight*.26+(Math.random()-.5)*60+"px",width:w+"px",height:"auto",opacity:0,mixBlendMode:"screen"});
+  im.animate([{opacity:0,transform:"scale(1.1) rotate(-6deg)",filter:"blur(4px)"},{opacity:.9,transform:"scale(1) rotate(-4deg)",filter:"blur(0)",offset:.18},{opacity:.75,transform:"scale(1) rotate(-4deg)",filter:"blur(1px)",offset:.55},{opacity:0,transform:"scale(1.02) rotate(-4deg)",filter:"blur(8px)"}],{duration:1600,delay:demora,fill:"forwards"});
+  setTimeout(()=>Sonido.play("susurro"),demora);
+}
+const EFECTO={
+  garra(ov,id,cr){
+    ov.classList.add("oscuro");
+    abalanzar(ov, FIGURA.has(id)?`sustos/${id}.webp`:`arte/${id}.jpg`, cr);
+    Sonido.play("grunido", .9, id==="uturunco"?95:70);
+    if(id==="familiar") Sonido.play("cadenas");
+    setTimeout(()=>{ zarpazos(ov); temblar(); vibrar([40,30,110]); Sonido.play("zarpazo"); },400);
+    return 1800;
+  },
+  herradura(ov,id,cr){
+    ov.classList.add("oscuro"); Sonido.play("cadenas");
+    abalanzar(ov,"sustos/mulanima.webp",cr,{escala:1.3});
+    setTimeout(()=>Sonido.play("rebuzno"),120);
+    setTimeout(()=>{
+      temblar(); vibrar([120]); Sonido.play("herradura");
+      const ns="http://www.w3.org/2000/svg", W=innerWidth, H=innerHeight, R=Math.min(W,H)*.2, cx=W/2, cy=H*.5;
+      const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+      const arco=`M${cx-R},${cy-R*.9} L${cx-R},${cy} A${R},${R} 0 0 0 ${cx+R},${cy} L${cx+R},${cy-R*.9}`;
+      svg.innerHTML=`<defs><filter id="brasaF"><feGaussianBlur stdDeviation="6"/></filter></defs>
+        <path d="${arco}" fill="none" stroke="#e39a43" stroke-width="${R*.42}" stroke-linecap="round" filter="url(#brasaF)" opacity=".85" class="glow"/>
+        <path d="${arco}" fill="none" stroke="#1c0907" stroke-width="${R*.3}" stroke-linecap="round"/>
+        <path d="${arco}" fill="none" stroke="#5e1a15" stroke-width="${R*.12}" stroke-linecap="round" opacity=".9"/>
+        ${[[-1,-.55],[-1,-.1],[-.75,.6],[1,-.55],[1,-.1],[.75,.6]].map(([a,b])=>`<circle cx="${cx+a*R}" cy="${cy+b*R}" r="${R*.05}" fill="#e39a43"/>`).join("")}`;
+      ov.appendChild(svg);
+      svg.querySelector(".glow").animate([{opacity:.95},{opacity:.15}],{duration:1300,fill:"forwards"});
+      svg.animate([{opacity:1},{opacity:1,offset:.6},{opacity:0}],{duration:1400,fill:"forwards"});
+      for(let i=0;i<5;i++){ const h=document.createElement("div"); h.className="humo"; h.style.left=cx-60+(Math.random()-.5)*R*1.6+"px"; h.style.top=cy-60+(Math.random()-.3)*R+"px"; ov.appendChild(h);
+        h.animate([{opacity:0,transform:"translateY(0) scale(.6)"},{opacity:.8,offset:.3},{opacity:0,transform:`translateY(-${120+Math.random()*80}px) scale(1.6)`}],{duration:1300,delay:i*90,fill:"forwards"}); }
+    },430);
+    return 1900;
+  },
+  cuero(ov){
+    ov.classList.add("oscuro"); Sonido.play("agua"); setTimeout(()=>Sonido.play("grunido",1,46),250);
+    const c=document.createElement("div"); c.className="cierre"; ov.appendChild(c);
+    c.animate([{boxShadow:"inset 0 0 0 0 #000"},{boxShadow:`inset 0 0 90px ${Math.min(innerWidth,innerHeight)*.22}px #000`,offset:.55},{boxShadow:"inset 0 0 0 0 #000"}],{duration:1900,easing:"ease-in-out",fill:"forwards"});
+    const w=innerWidth*1.15, im=imgSusto(ov,"sustos/cuero.webp",{left:(innerWidth-w)/2+"px",bottom:"0px",width:w+"px",height:"auto"});
+    im.animate([{transform:"translateY(100%)"},{transform:"translateY(8%)",offset:.35},{transform:"translateY(-6%) scale(1.06)",offset:.7},{transform:"translateY(100%)"}],{duration:1900,easing:"ease-in-out",fill:"forwards"});
+    setTimeout(()=>{ temblar(); vibrar([250]); },600);
+    return 2000;
+  },
+  pombero(ov){
+    ov.classList.add("tenue"); Sonido.play("silbido");
+    const v=[...document.querySelectorAll(".marca:not(.der) .vela")], d=S.dano, objetivo=v[d?Math.max(0,d.desde-1):v.length-1];
+    const vr=objetivo?objetivo.getBoundingClientRect():{left:60,top:30,width:6,height:13};
+    const w=Math.min(innerWidth*.8,420), h=w*.64;
+    const im=imgSusto(ov,"sustos/pombero.webp",{left:"0px",top:(vr.top+vr.height/2-h*.48)+"px",width:w+"px",height:"auto"});
+    const alcance=vr.left+vr.width-w*.98;
+    im.animate([{transform:`translateX(${-w}px)`},{transform:`translateX(${alcance}px)`,offset:.35},{transform:`translateX(${alcance}px) rotate(-4deg)`,offset:.5},{transform:`translateX(${-w}px)`}],{duration:1500,easing:"ease-in-out",fill:"forwards"});
+    const rob=document.createElement("div"); rob.className="robada"; Object.assign(rob.style,{left:vr.left+"px",top:vr.top+"px",opacity:0}); ov.appendChild(rob);
+    rob.animate([{opacity:0},{opacity:0,offset:.49},{opacity:1,offset:.5,transform:"translateX(0)"},{opacity:1,transform:`translateX(${-vr.left-40}px) rotate(-30deg)`}],{duration:1500,easing:"ease-in-out",fill:"forwards"});
+    setTimeout(()=>{ Sonido.play("hojas"); vibrar([50]); },700);
+    return 1650;
+  },
+  yasi(ov){
+    ov.classList.add("tenue"); Sonido.play("yasi");
+    const w=Math.min(innerWidth*.62,320), im=imgSusto(ov,"sustos/yasi.webp",{right:"-4%",bottom:"0px",width:w+"px",height:"auto"});
+    im.animate([{transform:"translateY(105%) rotate(8deg)"},{transform:"translateY(18%) rotate(-4deg)",offset:.3},{transform:"translateY(22%) rotate(3deg)",offset:.6},{transform:"translateY(105%) rotate(8deg)"}],{duration:1600,easing:"ease-in-out",fill:"forwards"});
+    setTimeout(()=>{ Sonido.play("hojas"); vibrar([40,60,40]); },450);
+    return 1650;
+  },
+  viuda(ov){
+    ov.classList.add("negro"); $(".mesa")?.classList.add("sin-luz"); Sonido.play("lamento");
+    const w=Math.min(innerWidth*.7,420), im=imgSusto(ov,"sustos/viuda.webp",{left:(innerWidth-w)/2+"px",top:innerHeight*.3+"px",width:w+"px",height:"auto",opacity:0});
+    im.animate([{opacity:0,transform:"scale(.25)",filter:"blur(8px) grayscale(.6)"},{opacity:.45,transform:"scale(.42)",filter:"blur(3px) grayscale(.6)",offset:.55},{opacity:1,transform:"scale(2.3)",filter:"blur(0) grayscale(0)",offset:.68},{opacity:1,transform:"scale(2.4)",filter:"blur(0)",offset:.78},{opacity:0,transform:"scale(2.8)",filter:"blur(14px)"}],{duration:1900,fill:"forwards"});
+    setTimeout(()=>{ temblar(); vibrar([80,40,220]); },1250);
+    setTimeout(()=>{ $(".mesa")?.classList.remove("sin-luz"); manoFantasma(ov); },1700);
+    return 3100;
+  },
+  mano(ov){ ov.classList.add("tenue"); manoFantasma(ov,100); return 1800; }
+};
+function asustar(id){
+  return new Promise(res=>{
+    const e=ESPANTOS[id], fam=e.poder>=3 ? FAMILIA[id] : "mano";
+    const ov=document.createElement("div"); ov.className="susto"; ov.setAttribute("aria-hidden","true"); document.body.appendChild(ov);
+    const ce=$("#slotE .carta"), cr=ce ? ce.getBoundingClientRect() : {left:innerWidth/2-50,top:innerHeight/2-70,width:100,height:140};
+    let fin=false;
+    const terminar=()=>{ if(fin) return; fin=true; $(".mesa")?.classList.remove("sin-luz"); ov.style.transition="opacity .3s"; ov.style.opacity="0"; setTimeout(()=>{ ov.remove(); res(); },320); };
+    ov.addEventListener("click",terminar);
+    if(reduce){ ov.classList.add("oscuro"); if(fam==="mano"||fam==="viuda") manoFantasma(ov); else zarpazos(ov); setTimeout(terminar,1300); return; }
+    let dur=1800; try{ dur=EFECTO[fam](ov,id,cr); }catch(_){}
+    setTimeout(terminar,dur);
+  });
+}
+function efectosResultado(){
+  const r=S.res; if(!r) return;
+  setTimeout(()=>Sonido.play("sello"),300);
+  if(r.tipo==="bien") setTimeout(()=>Sonido.play("premio"),450);
+  for(let i=0;i<r.dano;i++) setTimeout(()=>Sonido.play("vela",0),480+i*170);
+}
+
 const $ = s => document.querySelector(s);
 const sleep = ms => new Promise(r => setTimeout(r, reduce ? Math.min(ms, 250) : ms));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -312,6 +562,8 @@ function comenzarTurno(){
   while(p.mano.length<MANO && (S.mazo.length || S.descarte.length)) robar(S.turno);
   S.fase="ataque"; S.ataque=null; S.defensa=null; S.res=null; S.sel=null; S.dano=null;
   if(!esBot(S.turno)) S.burbuja=null;
+  const vistas=S.nuevas.filter(u=>S.players[viewer()].mano.some(c=>c.uid===u)).length;
+  if(vistas && !S.telon) Sonido.play("repartir",Math.min(vistas,7));
   render(); programarBot();
 }
 function lanzar(uid){
@@ -347,7 +599,10 @@ function resolver(remUid){
       ? {t:{bien:`Eso se espanta con ${REMEDIOS[e.remedio].nombre.toLowerCase()}, m'hijo.`,mal:"Uh… con esto no era.",rosario:"Con el rosario algo me cubro.",aguanta:"Me lo banco nomás."}[tipo]}
       : {t:{bien:"¡Mirá vos! Sabías.",mal:"Je. Con eso no se va.",rosario:"A medias, nomás.",aguanta:"Te lo comiste entero."}[tipo]};
   } else S.burbuja=null;
-  render();
+  if(debeAsustar()){
+    S.sustoPend=true; render(); ocupado=true;
+    asustar(S.ataque.id).then(()=>{ ocupado=false; S.sustoPend=false; render(); efectosResultado(); });
+  } else { render(); efectosResultado(); }
 }
 function seguir(){
   if(S.ataque) S.descarte.push(S.ataque);
@@ -377,16 +632,18 @@ function volar(html, from, to, o={}){
     Object.assign(g.style,{left:from.left+"px",top:from.top+"px",width:from.width+"px",height:from.height+"px"});
     g.innerHTML = o.flip ? DORSO : html;
     document.body.appendChild(g);
+    if(!o.mudo) Sonido.play("deslizar");
+    const fin=gg=>{ if(!o.mudo) Sonido.play("carta"); res(gg); };
     const dx=(to.left+to.width/2)-(from.left+from.width/2), dy=(to.top+to.height/2)-(from.top+from.height/2), s=to.width/from.width;
     const dur=reduce?1:(o.dur||480), r0=o.rot0||0, r1=o.rot1||0;
     const t0=`translate(0px,0px) rotate(${r0}deg) scale(1,1)`, t1=`translate(${dx}px,${dy}px) rotate(${r1}deg) scale(${s},${s})`;
     if(!o.flip){
-      g.animate([{transform:t0},{transform:t1}],{duration:dur,easing:"cubic-bezier(.2,.8,.2,1)",fill:"forwards"}).finished.then(()=>res(g),()=>res(g));
+      g.animate([{transform:t0},{transform:t1}],{duration:dur,easing:"cubic-bezier(.2,.8,.2,1)",fill:"forwards"}).finished.then(()=>fin(g),()=>fin(g));
     } else {
       const sm=(1+s)/2, tm=`translate(${dx/2}px,${dy/2-30}px) rotate(${(r0+r1)/2}deg) scale(0.02,${sm})`;
       g.animate([{transform:t0},{transform:tm}],{duration:dur/2,easing:"ease-in",fill:"forwards"}).finished
         .then(()=>{ g.innerHTML=html; return g.animate([{transform:tm},{transform:t1}],{duration:dur/2,easing:"ease-out",fill:"forwards"}).finished; })
-        .then(()=>res(g),()=>res(g));
+        .then(()=>fin(g),()=>fin(g));
     }
   });
 }
@@ -421,7 +678,7 @@ function tocar(uid){
   if(S.sel===uid){
     if(miAccion()) jugarEl(uid);
     else { S.sel=null; render(); }
-  } else { S.sel=uid; render(); }
+  } else { S.sel=uid; Sonido.play("tick"); render(); }
 }
 async function accionCambiar(){
   if(!miAccion() || S.fase!=="ataque" || S.sel==null) return;
@@ -491,6 +748,7 @@ function cartaHTML(c,{boton=false,cls="",estilo=""}={}){
 }
 function velasHTML(p){
   const pl=S.players[p], dn=S.dano && S.dano.p===p ? S.dano : null;
+  if(dn && S.sustoPend){ let h=""; for(let k=0;k<CORAJE;k++) h+=`<span class="vela${k>=dn.desde?" off":""}"></span>`; return `<div class="velas" aria-hidden="true">${h}</div>`; }
   let h="";
   for(let k=0;k<CORAJE;k++){
     let c="vela";
@@ -507,7 +765,7 @@ function fichaSel(c){
 function juegoHTML(){
   const v=viewer(), r=otro(v), yo=S.players[v], riv=S.players[r];
   const act=actor(), mia=miAccion(), pensando=act!==null && esBot(act);
-  const res=S.res;
+  const res=S.sustoPend ? null : S.res;
   let clsE="", clsR="";
   if(res){ if(res.tipo==="bien") clsE="vencido"; else { clsE="triunfa"; if(res.tipo==="mal") clsR="inutil"; } }
   const sel=S.sel!=null ? yo.mano.find(c=>c.uid===S.sel) : null;
@@ -559,6 +817,7 @@ function juegoHTML(){
       <button class="iconbtn" data-act="menu" aria-label="Volver al inicio">${ICON_ATRAS}</button>
       <div class="marca ${act===v?"turno":""}"><b>${esc(yo.nombre)}</b>${velasHTML(v)}</div>
       <div class="marca der ${act===r?"turno":""}"><b>${esc(riv.nombre)}</b>${velasHTML(r)}</div>
+      <button class="iconbtn ${PREF.sonido?"":"apagado"}" data-act="sonido" aria-pressed="${PREF.sonido}" aria-label="${PREF.sonido?"Silenciar":"Activar sonido"}">${PREF.sonido?ICON_SON:ICON_MUDO}</button>
       <button class="iconbtn" data-act="ver" data-v="bestiario" aria-label="Bestiario">${ICON_LIBRO}</button>
     </header>
     <div class="mesa">
@@ -586,7 +845,7 @@ function portadaHTML(){
   return `<div class="pagina">
     <div class="heroe" aria-hidden="true">${["futre","mulanima","viuda"].map((id,i)=>`<div class="h h${i}">${cartaHTML({t:"e",id})}</div>`).join("")}</div>
     <span class="etq">Cartas de espantos argentinos</span>
-    <h1>Mal Agüero</h1>
+    <h1 class="portada-tit"><img class="logo" src="marca/logo.webp" alt="Mal Agüero" width="900" height="400"></h1>
     <p class="sub">Uno lanza un espanto, el otro tiene que saber qué lo frena. Gana quien conserva el coraje.</p>
     ${instalarHTML()}
     ${enCurso?`<button class="btn prim" data-act="seguir-partida">Seguir la partida</button>`:""}
@@ -596,6 +855,7 @@ function portadaHTML(){
       <label for="j2">Segundo jugador<input id="j2" maxlength="14" placeholder="Jesi" value="${esc(n2)}"></label>
       <button class="btn" data-act="iniciar-dos">Dos en un celu</button>
     </div>
+    <div class="fila"><button class="btn chico" data-act="sonido" aria-pressed="${PREF.sonido}">Sonido: ${PREF.sonido?"sí":"no"}</button><button class="btn chico" data-act="sustos" aria-pressed="${PREF.sustos}">Sustos fuertes: ${PREF.sustos?"sí":"no"}</button></div>
     <div class="fila"><button class="vinc" data-act="ver" data-v="reglas">Cómo se juega</button><button class="vinc" data-act="ver" data-v="bestiario">Bestiario</button></div>
   </div>`;
 }
@@ -649,6 +909,7 @@ function acomodarAbanico(){
 }
 function render(){
   document.documentElement.classList.toggle("en-juego", S.vista==="juego");
+  if(S.vista==="juego") Sonido.ambienteOn(); else Sonido.ambienteOff();
   const app=$("#app");
   if(S.vista==="juego"){ app.innerHTML=juegoHTML(); acomodarAbanico(); if(!S.telon) S.nuevas=[]; }
   else {
@@ -723,6 +984,8 @@ document.addEventListener("click",e=>{
   else if(a==="volver"){ S.vista=S.volver||"portada"; render(); programarBot(); }
   else if(a==="menu"){ S.vista="portada"; render(); }
   else if(a==="instalar") instalar();
+  else if(a==="sonido"){ Sonido.iniciar(); Sonido.setOn(!PREF.sonido); if(PREF.sonido && S.vista==="juego") Sonido.ambienteOn(); render(); }
+  else if(a==="sustos"){ PREF.sustos=!PREF.sustos; guardarPref(); render(); }
   else if(a==="telon") levantarTelon();
   else if(a==="jugar"){ if(S.sel!=null) jugarEl(S.sel); }
   else if(a==="cambiar") accionCambiar();
@@ -761,7 +1024,7 @@ async function instalar(){
 function start(data){
   S = data && data.S && "enJuego" in data.S ? data.S : nuevoEstado("Vos",BOT,"bot");
   if(data && data.uidSeq) uidSeq=data.uidSeq;
-  S.nuevas=S.nuevas||[]; ocupado=false; botCorriendo=false;
+  S.nuevas=S.nuevas||[]; S.sustoPend=false; ocupado=false; botCorriendo=false;
   window.claude?.hot?.snapshot?.(()=>({S,uidSeq}));
   render(); programarBot();
 }
