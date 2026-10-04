@@ -186,6 +186,11 @@ input{background:var(--tinta);border:1px solid var(--linea);color:var(--hueso);p
 .susto img{position:fixed;pointer-events:none;max-width:none;will-change:transform,opacity;transform-origin:50% 50%}
 .susto svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .susto .cierre{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 #000}
+.susto .fig{position:fixed;pointer-events:none;will-change:transform,opacity;transform-origin:50% 50%}
+.susto .fig img{position:static;display:block;width:100%;height:auto}
+.susto .fig img.ojos{position:absolute;left:0;top:0;width:100%;height:100%;mix-blend-mode:screen;opacity:0}
+.susto .destello{position:fixed;width:70vmax;height:70vmax;border-radius:50%;pointer-events:none;mix-blend-mode:screen;background:radial-gradient(circle,rgba(255,240,215,.95),rgba(227,154,67,.6) 22%,rgba(181,53,43,.28) 44%,transparent 66%)}
+.susto .brasa{position:fixed;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#ffc070;box-shadow:0 0 8px 2px rgba(255,120,30,.9);pointer-events:none}
 .susto .humo{position:fixed;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(160,150,140,.45),transparent 70%);pointer-events:none}
 .susto .robada{position:fixed;width:6px;height:13px;border-radius:1px;background:var(--brasa);box-shadow:0 -2px 8px rgba(227,154,67,.8)}
 .mesa.sin-luz .velita::before{opacity:0;transition:opacity .2s}
@@ -342,7 +347,7 @@ const Sonido = (()=>{
     },
     cadenas(){ const t=ctx.currentTime; for(let i=0;i<10;i++){ const tt=t+i*.045+Math.random()*.02; tono(tt,.12,{tipo:"triangle",f:2400+Math.random()*2600,pico:.1}); tono(tt,.07,{tipo:"square",f:3800+Math.random()*1500,pico:.035}); } },
     rebuzno(){ const t=ctx.currentTime; for(let k=0;k<2;k++){ const b=t+k*.62; tono(b,.24,{tipo:"sawtooth",f:560,f2:500,pico:.32,a:.03,filtro:1700}); tono(b+.26,.32,{tipo:"sawtooth",f:270,f2:210,pico:.36,a:.03,filtro:1100}); } },
-    herradura(){ const t=ctx.currentTime; tono(t,.32,{f:90,f2:38,pico:.95}); ruido(t,.1,{tipo:"lowpass",f:700,pico:.5}); ruido(t+.06,1.2,{tipo:"highpass",f:4200,pico:.16,a:.03}); },
+    vidrio(){ const t=ctx.currentTime; tono(t,.32,{f:95,f2:38,pico:.95}); ruido(t,.09,{tipo:"lowpass",f:800,pico:.55}); ruido(t,.4,{tipo:"highpass",f:3200,pico:.42,a:.002}); for(let i=0;i<16;i++){ const tt=t+.01+Math.random()*.45; tono(tt,.08+Math.random()*.16,{f:2400+Math.random()*4800,pico:.05+Math.random()*.06}); } },
     silbido(){ const t=ctx.currentTime; const o=tono(t,.8,{f:1500,f2:2350,pico:.15,a:.06}); vibrato(o,t,.8,7,40); },
     yasi(){ const t=ctx.currentTime; for(let k=0;k<2;k++){ const b=t+k*.75; tono(b,.18,{f:1850,f2:2450,pico:.16}); tono(b+.24,.16,{f:2450,f2:2050,pico:.15}); tono(b+.44,.22,{f:2100,f2:1800,pico:.13}); } },
     hojas(){ const t=ctx.currentTime; for(let i=0;i<7;i++) ruido(t+i*.055,.08,{f:5200,q:.7,pico:.12}); },
@@ -383,7 +388,17 @@ function vibrar(p){ try{ if(PREF.sustos && navigator.vibrate) navigator.vibrate(
 
 /* ---------- sustos ---------- */
 const FAMILIA={lobizon:"garra",uturunco:"garra",ucumar:"garra",familiar:"garra",mulanima:"herradura",cuero:"cuero",pombero:"pombero",yasi:"yasi",viuda:"viuda"};
-const FIGURA=new Set(["lobizon","uturunco","mulanima","cuero","pombero","yasi","viuda"]);
+const FIGURA=new Set(["lobizon","uturunco","ucumar","familiar","mulanima","cuero","pombero","yasi","viuda"]);
+const OJOS=new Set(["lobizon","uturunco","ucumar","familiar","mulanima","viuda","yasi"]);
+function figura(ov,id,css,demoraOjos=120){
+  const d=document.createElement("div"); d.className="fig"; Object.assign(d.style,css);
+  const im=new Image(); im.src=`sustos/${id}.webp`; im.alt=""; d.appendChild(im);
+  if(OJOS.has(id)){
+    const o=new Image(); o.src=`sustos/${id}-ojos.webp`; o.alt=""; o.className="ojos"; d.appendChild(o);
+    o.animate([{opacity:0},{opacity:1,offset:.25},{opacity:.35,offset:.33},{opacity:1,offset:.45},{opacity:.8,offset:.7},{opacity:1}],{duration:850,delay:demoraOjos,fill:"forwards"});
+  }
+  ov.appendChild(d); return d;
+}
 function debeAsustar(){
   const r=S.res; if(!PREF.sustos || !r || r.tipo==="bien" || r.dano<=0) return false;
   return S.modo==="dos" || r.def===0;
@@ -417,8 +432,9 @@ function zarpazos(ov,demora=0){
   }
   svg.animate([{opacity:1},{opacity:0}],{duration:700,delay:demora+1000,fill:"forwards"});
 }
-function abalanzar(ov,src,cr,{escala=1.25,dur=420}={}){
-  const w0=cr.width, im=imgSusto(ov,src,{left:cr.left+"px",top:cr.top+"px",width:w0+"px",height:"auto"});
+function abalanzar(ov,id,cr,{escala=1.25,dur=420}={}){
+  const w0=cr.width, css={left:cr.left+"px",top:cr.top+"px",width:w0+"px"};
+  const im=FIGURA.has(id) ? figura(ov,id,css,0) : imgSusto(ov,`arte/${id}.jpg`,{...css,height:"auto"});
   const W=Math.min(innerWidth*escala,760), s=W/w0;
   const dx=innerWidth/2-(cr.left+w0/2), dy=innerHeight*.42-(cr.top+cr.height/2);
   im.animate([{transform:"translate(0,0) scale(1) rotate(-6deg)",opacity:.5},{transform:`translate(${dx}px,${dy}px) scale(${s}) rotate(3deg)`,opacity:1,offset:.8},{transform:`translate(${dx}px,${dy}px) scale(${s*1.06}) rotate(0deg)`,opacity:1}],{duration:dur,easing:"cubic-bezier(.55,0,.85,.45)",fill:"forwards"});
@@ -431,10 +447,50 @@ function manoFantasma(ov,demora=0){
   im.animate([{opacity:0,transform:"scale(1.1) rotate(-6deg)",filter:"blur(4px)"},{opacity:.9,transform:"scale(1) rotate(-4deg)",filter:"blur(0)",offset:.18},{opacity:.75,transform:"scale(1) rotate(-4deg)",filter:"blur(1px)",offset:.55},{opacity:0,transform:"scale(1.02) rotate(-4deg)",filter:"blur(8px)"}],{duration:1600,delay:demora,fill:"forwards"});
   setTimeout(()=>Sonido.play("susurro"),demora);
 }
+function rajadura(ov,cx,cy){
+  const ns="http://www.w3.org/2000/svg", W=innerWidth, H=innerHeight, R=Math.hypot(W,H);
+  const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const linea=(pts,fina)=>{ const d="M"+pts.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1)).join("L");
+    return `<path d="${d}" fill="none" stroke="rgba(0,0,0,.7)" stroke-width="${fina?2.4:3.4}" transform="translate(1.5 1.5)"/><path d="${d}" fill="none" stroke="rgba(242,236,226,${fina?.68:.93})" stroke-width="${fina?.9:1.5}" stroke-linejoin="round"/>`; };
+  let html=""; const n=13, rad=[];
+  for(let i=0;i<n;i++){
+    let a=(i/n)*Math.PI*2+(Math.random()-.5)*.35, x=cx, y=cy, d=0; const largo=R*(.3+Math.random()*.55), pts=[[x,y]];
+    while(d<largo){
+      const paso=14+Math.random()*28; a+=(Math.random()-.5)*.32; x+=Math.cos(a)*paso; y+=Math.sin(a)*paso; d+=paso; pts.push([x,y]);
+      if(d>50 && Math.random()<.09){
+        let bx=x, by=y, ba=a+(Math.random()<.5?-1:1)*(.45+Math.random()*.5); const bp=[[bx,by]];
+        for(let k=0;k<4+Math.random()*6;k++){ const p=9+Math.random()*20; ba+=(Math.random()-.5)*.4; bx+=Math.cos(ba)*p; by+=Math.sin(ba)*p; bp.push([bx,by]); }
+        html+=linea(bp,true);
+      }
+    }
+    rad.push(pts); html+=linea(pts,false);
+  }
+  [2,4,7].forEach(k=>{ for(let i=0;i<n;i++){ if(Math.random()<.3) continue;
+    const A=rad[i], B=rad[(i+1)%n], p=A[Math.min(A.length-1,k+(Math.random()<.5?0:1))], q=B[Math.min(B.length-1,k+(Math.random()<.5?0:1))];
+    html+=linea([p,[(p[0]+q[0])/2+(Math.random()-.5)*12,(p[1]+q[1])/2+(Math.random()-.5)*12],q],true); } });
+  for(let i=0;i<10;i++){ const a=Math.random()*Math.PI*2, r1=8+Math.random()*10, r2=20+Math.random()*28, a2=a+.3+Math.random()*.4;
+    html+=`<polygon points="${cx},${cy} ${(cx+Math.cos(a)*r2).toFixed(1)},${(cy+Math.sin(a)*r2).toFixed(1)} ${(cx+Math.cos(a2)*r1*1.7).toFixed(1)},${(cy+Math.sin(a2)*r1*1.7).toFixed(1)}" fill="rgba(240,232,220,${(.12+Math.random()*.35).toFixed(2)})"/>`; }
+  svg.innerHTML=html+`<circle cx="${cx}" cy="${cy}" r="6" fill="rgba(255,255,255,.92)"/>`;
+  ov.appendChild(svg);
+  svg.animate([{clipPath:`circle(0px at ${cx}px ${cy}px)`},{clipPath:`circle(${R}px at ${cx}px ${cy}px)`}],{duration:reduce?1:160,easing:"ease-out",fill:"forwards"});
+  svg.animate([{opacity:1},{opacity:1,offset:.72},{opacity:0}],{duration:1900,fill:"forwards"});
+}
+function brasas(ov,cx,cy){
+  for(let i=0;i<24;i++){
+    const b=document.createElement("div"); b.className="brasa"; b.style.left=cx+"px"; b.style.top=cy+"px"; ov.appendChild(b);
+    const a=Math.random()*Math.PI*2, v=70+Math.random()*190, dx=Math.cos(a)*v, dy=Math.sin(a)*v*.55-(90+Math.random()*170);
+    b.animate([{transform:"translate(0,0) scale(1.2)",opacity:1},{transform:`translate(${dx}px,${dy}px) scale(.25)`,opacity:0}],{duration:700+Math.random()*800,easing:"cubic-bezier(.2,.7,.4,1)",fill:"forwards"});
+  }
+}
 const EFECTO={
   garra(ov,id,cr){
     ov.classList.add("oscuro");
-    abalanzar(ov, FIGURA.has(id)?`sustos/${id}.webp`:`arte/${id}.jpg`, cr);
+    if(id==="ucumar"){
+      const w=Math.min(innerWidth*1.25,900), el=figura(ov,"ucumar",{left:(innerWidth-w)/2+"px",bottom:"0px",width:w+"px"},150);
+      el.style.transformOrigin="50% 100%";
+      el.animate([{transform:"translateY(100%) scale(.85)"},{transform:"translateY(4%) scale(1)",offset:.6},{transform:"translateY(0) scale(1.1)"}],{duration:480,easing:"cubic-bezier(.3,0,.6,1)",fill:"forwards"});
+      el.animate([{opacity:1},{opacity:0}],{duration:450,delay:850,fill:"forwards"});
+    } else abalanzar(ov,id,cr);
     Sonido.play("grunido", .9, id==="uturunco"?95:70);
     if(id==="familiar") Sonido.play("cadenas");
     setTimeout(()=>{ zarpazos(ov); temblar(); vibrar([40,30,110]); Sonido.play("zarpazo"); },400);
@@ -442,25 +498,16 @@ const EFECTO={
   },
   herradura(ov,id,cr){
     ov.classList.add("oscuro"); Sonido.play("cadenas");
-    abalanzar(ov,"sustos/mulanima.webp",cr,{escala:1.3});
+    abalanzar(ov,"mulanima",cr,{escala:1.3});
     setTimeout(()=>Sonido.play("rebuzno"),120);
     setTimeout(()=>{
-      temblar(); vibrar([120]); Sonido.play("herradura");
-      const ns="http://www.w3.org/2000/svg", W=innerWidth, H=innerHeight, R=Math.min(W,H)*.2, cx=W/2, cy=H*.5;
-      const svg=document.createElementNS(ns,"svg"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
-      const arco=`M${cx-R},${cy-R*.9} L${cx-R},${cy} A${R},${R} 0 0 0 ${cx+R},${cy} L${cx+R},${cy-R*.9}`;
-      svg.innerHTML=`<defs><filter id="brasaF"><feGaussianBlur stdDeviation="6"/></filter></defs>
-        <path d="${arco}" fill="none" stroke="#e39a43" stroke-width="${R*.42}" stroke-linecap="round" filter="url(#brasaF)" opacity=".85" class="glow"/>
-        <path d="${arco}" fill="none" stroke="#1c0907" stroke-width="${R*.3}" stroke-linecap="round"/>
-        <path d="${arco}" fill="none" stroke="#5e1a15" stroke-width="${R*.12}" stroke-linecap="round" opacity=".9"/>
-        ${[[-1,-.55],[-1,-.1],[-.75,.6],[1,-.55],[1,-.1],[.75,.6]].map(([a,b])=>`<circle cx="${cx+a*R}" cy="${cy+b*R}" r="${R*.05}" fill="#e39a43"/>`).join("")}`;
-      ov.appendChild(svg);
-      svg.querySelector(".glow").animate([{opacity:.95},{opacity:.15}],{duration:1300,fill:"forwards"});
-      svg.animate([{opacity:1},{opacity:1,offset:.6},{opacity:0}],{duration:1400,fill:"forwards"});
-      for(let i=0;i<5;i++){ const h=document.createElement("div"); h.className="humo"; h.style.left=cx-60+(Math.random()-.5)*R*1.6+"px"; h.style.top=cy-60+(Math.random()-.3)*R+"px"; ov.appendChild(h);
-        h.animate([{opacity:0,transform:"translateY(0) scale(.6)"},{opacity:.8,offset:.3},{opacity:0,transform:`translateY(-${120+Math.random()*80}px) scale(1.6)`}],{duration:1300,delay:i*90,fill:"forwards"}); }
+      temblar(); vibrar([30,20,160]); Sonido.play("vidrio");
+      const cx=innerWidth*(.4+Math.random()*.2), cy=innerHeight*(.36+Math.random()*.16);
+      const fl=document.createElement("div"); fl.className="destello"; fl.style.left=cx+"px"; fl.style.top=cy+"px"; ov.appendChild(fl);
+      fl.animate([{opacity:1,transform:"translate(-50%,-50%) scale(.25)"},{opacity:0,transform:"translate(-50%,-50%) scale(1.9)"}],{duration:700,easing:"ease-out",fill:"forwards"});
+      rajadura(ov,cx,cy); brasas(ov,cx,cy);
     },430);
-    return 1900;
+    return 2400;
   },
   cuero(ov){
     ov.classList.add("oscuro"); Sonido.play("agua"); setTimeout(()=>Sonido.play("grunido",1,46),250);
@@ -486,14 +533,14 @@ const EFECTO={
   },
   yasi(ov){
     ov.classList.add("tenue"); Sonido.play("yasi");
-    const w=Math.min(innerWidth*.62,320), im=imgSusto(ov,"sustos/yasi.webp",{right:"-4%",bottom:"0px",width:w+"px",height:"auto"});
+    const w=Math.min(innerWidth*.62,320), im=figura(ov,"yasi",{right:"-4%",bottom:"0px",width:w+"px"},380);
     im.animate([{transform:"translateY(105%) rotate(8deg)"},{transform:"translateY(18%) rotate(-4deg)",offset:.3},{transform:"translateY(22%) rotate(3deg)",offset:.6},{transform:"translateY(105%) rotate(8deg)"}],{duration:1600,easing:"ease-in-out",fill:"forwards"});
     setTimeout(()=>{ Sonido.play("hojas"); vibrar([40,60,40]); },450);
     return 1650;
   },
   viuda(ov){
     ov.classList.add("negro"); $(".mesa")?.classList.add("sin-luz"); Sonido.play("lamento");
-    const w=Math.min(innerWidth*.7,420), im=imgSusto(ov,"sustos/viuda.webp",{left:(innerWidth-w)/2+"px",top:innerHeight*.3+"px",width:w+"px",height:"auto",opacity:0});
+    const w=Math.min(innerWidth*.7,420), im=figura(ov,"viuda",{left:(innerWidth-w)/2+"px",top:innerHeight*.3+"px",width:w+"px",opacity:0},620);
     im.animate([{opacity:0,transform:"scale(.25)",filter:"blur(8px) grayscale(.6)"},{opacity:.45,transform:"scale(.42)",filter:"blur(3px) grayscale(.6)",offset:.55},{opacity:1,transform:"scale(2.3)",filter:"blur(0) grayscale(0)",offset:.68},{opacity:1,transform:"scale(2.4)",filter:"blur(0)",offset:.78},{opacity:0,transform:"scale(2.8)",filter:"blur(14px)"}],{duration:1900,fill:"forwards"});
     setTimeout(()=>{ temblar(); vibrar([80,40,220]); },1250);
     setTimeout(()=>{ $(".mesa")?.classList.remove("sin-luz"); manoFantasma(ov); },1700);
