@@ -198,6 +198,21 @@ input{background:var(--tinta);border:1px solid var(--linea);color:var(--hueso);p
 .temblor{animation:temblor .45s linear}
 @keyframes temblor{10%{transform:translate(-9px,4px) rotate(-1deg)}20%{transform:translate(8px,-6px)}30%{transform:translate(-7px,-3px) rotate(1deg)}40%{transform:translate(6px,5px)}55%{transform:translate(-4px,2px)}70%{transform:translate(3px,-2px)}85%{transform:translate(-1px,1px)}}
 
+/* ---------- Tutorial ---------- */
+#coach{position:fixed;inset:0;z-index:250;pointer-events:none}
+.coach-hueco{position:fixed;border-radius:14px;box-shadow:0 0 0 200vmax rgba(8,6,5,.74);transition:left .35s ease,top .35s ease,width .35s ease,height .35s ease;pointer-events:none}
+.coach-hueco.foco{outline:2px solid var(--brasa);outline-offset:3px;animation:foco 1.6s ease-in-out infinite}
+@keyframes foco{50%{outline-offset:8px;outline-color:rgba(227,154,67,.35)}}
+.coach-globo{position:fixed;left:16px;right:16px;margin:0 auto;max-width:440px;pointer-events:auto;background:var(--hueso);color:var(--noche);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 14px 34px rgba(0,0,0,.65);transition:top .35s ease}
+.coach-quien{display:flex;align-items:center;gap:8px;font-family:var(--f-display);font-weight:700;font-size:15px}
+.coach-quien .avatar{width:30px;height:30px;font-size:16px;border-width:1px;background:var(--noche);color:var(--hueso)}
+.coach-paso{margin-left:auto;font-family:var(--f-texto);font-weight:400;font-size:12px;color:#6b5f52;font-variant-numeric:tabular-nums}
+.coach-txt{font-size:15.5px;line-height:1.42}
+.coach-pie{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.coach-pie .vinc{color:#6b5f52;font-size:14px}
+.coach-pie .btn{padding:9px 16px}
+.toast{z-index:270}
+
 /* ---------- Inicio ---------- */
 .intro{position:fixed;inset:0;z-index:200;background:var(--noche);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;overflow:hidden;cursor:pointer;animation:introFuera .7s 3.4s ease forwards}
 .intro.salir{animation:introFuera .35s ease forwards}
@@ -305,13 +320,37 @@ const ICON_MUDO = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" s
 
 /* ---------- sonido generado por código ---------- */
 const Sonido = (()=>{
-  let ctx=null, master=null, ruidoBuf=null, amb=null;
+  let ctx=null, master=null, ruidoBuf=null, amb=null, cargando=null;
+  const bufs={};
+  const ARCHIVOS=["ambiente","baba","caballo","fantasma","grito","hombre","luz","monstruo","oso","perro","rebuzno","silbido"];
+  /* id del espanto -> [muestra, velocidad, volumen, duración máxima] */
+  const VOCES={lobizon:["monstruo",1,1,3.2],uturunco:["monstruo",1.22,1,2.6],ucumar:["oso",1,1,2.8],familiar:["perro",1,1,2.9],
+    mulanima:["rebuzno",1,1,3.4],cuero:["baba",1,1.1,3],viuda:["grito",1,1,1.5],pombero:["silbido",.82,.9,2.2],yasi:["silbido",1.08,.9,2.6],
+    futre:["caballo",1,1,3.2],enancada:["fantasma",1.12,1,2.6],animas:["fantasma",.88,1,2.7],luzmala:["luz",1,.9,3.6]};
+  const SINTE={lobizon:()=>SON.grunido(.9,70),uturunco:()=>SON.grunido(.8,95),ucumar:()=>SON.grunido(1,58),familiar:()=>{SON.grunido(.9,80);SON.cadenas();},
+    mulanima:()=>SON.rebuzno(),cuero:()=>{SON.agua();SON.grunido(1,46);},viuda:()=>SON.lamento(),pombero:()=>SON.silbido(),yasi:()=>SON.yasi(),
+    futre:()=>SON.susurro(),enancada:()=>SON.susurro(),animas:()=>SON.susurro(),luzmala:()=>SON.susurro()};
+  function cargarMuestras(){
+    if(cargando || !ctx) return;
+    cargando=Promise.all(ARCHIVOS.map(k=>fetch(`sonidos/${k}.mp3`).then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status))
+      .then(ab=>new Promise((res,rej)=>ctx.decodeAudioData(ab,res,rej))).then(b=>{ bufs[k]=b; }).catch(()=>{})))
+      .then(()=>{ if(amb && amb.sinte && bufs.ambiente){ ambienteOff(); setTimeout(ambienteOn,900); } });
+  }
+  function muestra(k,{vol=1,rate=1,dur=null}={}){
+    const b=bufs[k]; if(!b || !listo()) return false;
+    const t=ctx.currentTime, src=ctx.createBufferSource(); src.buffer=b; src.playbackRate.value=rate;
+    const g=ctx.createGain(); g.gain.setValueAtTime(vol,t); src.connect(g).connect(master);
+    if(dur && dur*rate<b.duration){ g.gain.setValueAtTime(vol,t+Math.max(0,dur-.35)); g.gain.linearRampToValueAtTime(.0001,t+dur); src.start(t,0,dur*rate+.05); }
+    else src.start(t);
+    return true;
+  }
   function iniciar(){
     if(ctx){ if(ctx.state==="suspended") ctx.resume().catch(()=>{}); return; }
     const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
     ctx=new AC(); master=ctx.createGain(); master.gain.value=PREF.sonido?.9:0; master.connect(ctx.destination);
     const len=ctx.sampleRate*2; ruidoBuf=ctx.createBuffer(1,len,ctx.sampleRate);
     const d=ruidoBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    cargarMuestras();
   }
   const listo=()=>ctx && PREF.sonido && ctx.state!=="closed";
   function env(g,t,a,pico,dec){ g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(pico,t+a); g.gain.exponentialRampToValueAtTime(.0001,t+a+dec); }
@@ -363,25 +402,39 @@ const Sonido = (()=>{
     susurro(){ const t=ctx.currentTime; for(let i=0;i<5;i++) ruido(t+i*.2,.24,{f:1700+Math.random()*1400,q:3,pico:.1,a:.08}); tono(t,1.2,{f:180,f2:150,pico:.04,a:.3}); }
   };
   function play(n,...a){ try{ iniciar(); if(listo() && SON[n]) SON[n](...a); }catch(_){} }
+  function voz(id,{suave=false}={}){
+    try{
+      iniciar(); if(!listo()) return;
+      const v=VOCES[id];
+      if(v && muestra(v[0],{rate:v[1],vol:v[2]*(suave?.4:1),dur:suave?Math.min(1.6,v[3]):v[3]})) return;
+      if(!suave && SINTE[id]) SINTE[id]();
+    }catch(_){}
+  }
+  function grito(){ try{ iniciar(); if(listo()) muestra("hombre",{vol:.9}); }catch(_){} }
   function ambienteOn(){
     try{
       if(!listo() || amb) return;
+      if(bufs.ambiente){
+        const t=ctx.currentTime, g=ctx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.55,t+2.5); g.connect(master);
+        const s=ctx.createBufferSource(); s.buffer=bufs.ambiente; s.loop=true; s.connect(g); s.start();
+        amb={g,s,lfo:null,grillo:null,sinte:false}; return;
+      }
       const t=ctx.currentTime, g=ctx.createGain(); g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.05,t+2.5); g.connect(master);
       const s=ctx.createBufferSource(); s.buffer=ruidoBuf; s.loop=true;
       const fl=ctx.createBiquadFilter(); fl.type="lowpass"; fl.frequency.value=380;
       const lfo=ctx.createOscillator(); lfo.frequency.value=.07; const lg=ctx.createGain(); lg.gain.value=200; lfo.connect(lg).connect(fl.frequency);
       s.connect(fl).connect(g); s.start(); lfo.start();
       const grillo=setInterval(()=>{ if(!listo()) return; const t=ctx.currentTime; for(let i=0;i<3;i++) tono(t+i*.07,.03,{f:4300,pico:.018}); },2600);
-      amb={g,s,lfo,grillo};
+      amb={g,s,lfo,grillo,sinte:true};
     }catch(_){}
   }
   function ambienteOff(){
     if(!amb) return; const a=amb; amb=null; clearInterval(a.grillo);
     try{ const t=ctx.currentTime; a.g.gain.cancelScheduledValues(t); a.g.gain.setValueAtTime(Math.max(a.g.gain.value,.0001),t); a.g.gain.exponentialRampToValueAtTime(.0001,t+.6); }catch(_){}
-    setTimeout(()=>{ try{ a.s.stop(); a.lfo.stop(); }catch(_){} },800);
+    setTimeout(()=>{ try{ a.s.stop(); if(a.lfo) a.lfo.stop(); }catch(_){} },800);
   }
   function setOn(on){ PREF.sonido=on; guardarPref(); if(master) master.gain.value=on?.9:0; if(!on) ambienteOff(); }
-  return {iniciar,play,ambienteOn,ambienteOff,setOn};
+  return {iniciar,play,voz,grito,ambienteOn,ambienteOff,setOn};
 })();
 document.addEventListener("pointerdown",()=>{ Sonido.iniciar(); if(S && S.vista==="juego") Sonido.ambienteOn(); },{passive:true,capture:true});
 function vibrar(p){ try{ if(PREF.sustos && navigator.vibrate) navigator.vibrate(p); }catch(_){} }
@@ -441,11 +494,11 @@ function abalanzar(ov,id,cr,{escala=1.25,dur=420}={}){
   im.animate([{opacity:1},{opacity:0}],{duration:450,delay:dur+380,fill:"forwards"});
   return im;
 }
-function manoFantasma(ov,demora=0){
+function manoFantasma(ov,demora=0,id=null){
   const w=Math.min(innerWidth*.62,320);
   const im=imgSusto(ov,"sustos/mano.webp",{left:(innerWidth-w)/2+(Math.random()-.5)*innerWidth*.2+"px",top:innerHeight*.26+(Math.random()-.5)*60+"px",width:w+"px",height:"auto",opacity:0,mixBlendMode:"screen"});
   im.animate([{opacity:0,transform:"scale(1.1) rotate(-6deg)",filter:"blur(4px)"},{opacity:.9,transform:"scale(1) rotate(-4deg)",filter:"blur(0)",offset:.18},{opacity:.75,transform:"scale(1) rotate(-4deg)",filter:"blur(1px)",offset:.55},{opacity:0,transform:"scale(1.02) rotate(-4deg)",filter:"blur(8px)"}],{duration:1600,delay:demora,fill:"forwards"});
-  setTimeout(()=>Sonido.play("susurro"),demora);
+  setTimeout(()=>{ if(id) Sonido.voz(id); else Sonido.play("susurro"); },demora);
 }
 function rajadura(ov,cx,cy){
   const ns="http://www.w3.org/2000/svg", W=innerWidth, H=innerHeight, R=Math.hypot(W,H);
@@ -491,7 +544,7 @@ const EFECTO={
       el.animate([{transform:"translateY(100%) scale(.85)"},{transform:"translateY(4%) scale(1)",offset:.6},{transform:"translateY(0) scale(1.1)"}],{duration:480,easing:"cubic-bezier(.3,0,.6,1)",fill:"forwards"});
       el.animate([{opacity:1},{opacity:0}],{duration:450,delay:850,fill:"forwards"});
     } else abalanzar(ov,id,cr);
-    Sonido.play("grunido", .9, id==="uturunco"?95:70);
+    Sonido.voz(id);
     if(id==="familiar") Sonido.play("cadenas");
     setTimeout(()=>{ zarpazos(ov); temblar(); vibrar([40,30,110]); Sonido.play("zarpazo"); },400);
     return 1800;
@@ -499,7 +552,7 @@ const EFECTO={
   herradura(ov,id,cr){
     ov.classList.add("oscuro"); Sonido.play("cadenas");
     abalanzar(ov,"mulanima",cr,{escala:1.3});
-    setTimeout(()=>Sonido.play("rebuzno"),120);
+    setTimeout(()=>Sonido.voz("mulanima"),120);
     setTimeout(()=>{
       temblar(); vibrar([30,20,160]); Sonido.play("vidrio");
       const cx=innerWidth*(.4+Math.random()*.2), cy=innerHeight*(.36+Math.random()*.16);
@@ -510,7 +563,7 @@ const EFECTO={
     return 2400;
   },
   cuero(ov){
-    ov.classList.add("oscuro"); Sonido.play("agua"); setTimeout(()=>Sonido.play("grunido",1,46),250);
+    ov.classList.add("oscuro"); Sonido.voz("cuero"); setTimeout(()=>Sonido.play("grunido",1,46),350);
     const c=document.createElement("div"); c.className="cierre"; ov.appendChild(c);
     c.animate([{boxShadow:"inset 0 0 0 0 #000"},{boxShadow:`inset 0 0 90px ${Math.min(innerWidth,innerHeight)*.22}px #000`,offset:.55},{boxShadow:"inset 0 0 0 0 #000"}],{duration:1900,easing:"ease-in-out",fill:"forwards"});
     const w=innerWidth*1.15, im=imgSusto(ov,"sustos/cuero.webp",{left:(innerWidth-w)/2+"px",bottom:"0px",width:w+"px",height:"auto"});
@@ -519,7 +572,7 @@ const EFECTO={
     return 2000;
   },
   pombero(ov){
-    ov.classList.add("tenue"); Sonido.play("silbido");
+    ov.classList.add("tenue"); Sonido.voz("pombero");
     const v=[...document.querySelectorAll(".marca:not(.der) .vela")], d=S.dano, objetivo=v[d?Math.max(0,d.desde-1):v.length-1];
     const vr=objetivo?objetivo.getBoundingClientRect():{left:60,top:30,width:6,height:13};
     const w=Math.min(innerWidth*.8,420), h=w*.64;
@@ -532,21 +585,21 @@ const EFECTO={
     return 1650;
   },
   yasi(ov){
-    ov.classList.add("tenue"); Sonido.play("yasi");
+    ov.classList.add("tenue"); Sonido.voz("yasi");
     const w=Math.min(innerWidth*.62,320), im=figura(ov,"yasi",{right:"-4%",bottom:"0px",width:w+"px"},380);
     im.animate([{transform:"translateY(105%) rotate(8deg)"},{transform:"translateY(18%) rotate(-4deg)",offset:.3},{transform:"translateY(22%) rotate(3deg)",offset:.6},{transform:"translateY(105%) rotate(8deg)"}],{duration:1600,easing:"ease-in-out",fill:"forwards"});
     setTimeout(()=>{ Sonido.play("hojas"); vibrar([40,60,40]); },450);
     return 1650;
   },
   viuda(ov){
-    ov.classList.add("negro"); $(".mesa")?.classList.add("sin-luz"); Sonido.play("lamento");
+    ov.classList.add("negro"); $(".mesa")?.classList.add("sin-luz"); setTimeout(()=>Sonido.voz("viuda"),1180);
     const w=Math.min(innerWidth*.7,420), im=figura(ov,"viuda",{left:(innerWidth-w)/2+"px",top:innerHeight*.3+"px",width:w+"px",opacity:0},620);
     im.animate([{opacity:0,transform:"scale(.25)",filter:"blur(8px) grayscale(.6)"},{opacity:.45,transform:"scale(.42)",filter:"blur(3px) grayscale(.6)",offset:.55},{opacity:1,transform:"scale(2.3)",filter:"blur(0) grayscale(0)",offset:.68},{opacity:1,transform:"scale(2.4)",filter:"blur(0)",offset:.78},{opacity:0,transform:"scale(2.8)",filter:"blur(14px)"}],{duration:1900,fill:"forwards"});
     setTimeout(()=>{ temblar(); vibrar([80,40,220]); },1250);
     setTimeout(()=>{ $(".mesa")?.classList.remove("sin-luz"); manoFantasma(ov); },1700);
     return 3100;
   },
-  mano(ov){ ov.classList.add("tenue"); manoFantasma(ov,100); return 1800; }
+  mano(ov,id){ ov.classList.add("tenue"); manoFantasma(ov,100,id); return 1800; }
 };
 function asustar(id){
   return new Promise(res=>{
@@ -563,6 +616,7 @@ function asustar(id){
 }
 function efectosResultado(){
   const r=S.res; if(!r) return;
+  if(S.fase==="fin" && (S.modo==="dos" || r.def===0)) setTimeout(()=>Sonido.grito(),700);
   setTimeout(()=>Sonido.play("sello"),300);
   if(r.tipo==="bien") setTimeout(()=>Sonido.play("premio"),450);
   for(let i=0;i<r.dano;i++) setTimeout(()=>Sonido.play("vela",0),480+i*170);
@@ -614,6 +668,7 @@ function comenzarTurno(){
   render(); programarBot();
 }
 function lanzar(uid){
+  const vz=S.players[S.turno].mano.find(c=>c.uid===uid); if(vz) setTimeout(()=>Sonido.voz(vz.id,{suave:true}),60);
   const a=S.turno, p=S.players[a], i=p.mano.findIndex(c=>c.uid===uid); if(i<0) return;
   S.ataque=p.mano.splice(i,1)[0]; S.sel=null; S.fase="defensa"; S.dano=null;
   const e=ESPANTOS[S.ataque.id];
@@ -699,6 +754,11 @@ function soltarVuelo(g){ requestAnimationFrame(()=>requestAnimationFrame(()=>g.r
 /* ---------- jugadas del humano ---------- */
 function validar(uid){
   const c=S.players[viewer()].mano.find(x=>x.uid===uid); if(!c) return false;
+  if(S.tuto){
+    const p=PASOS[S.tuto.i];
+    if(p && p.btn){ toast(`Primero leé lo que te dice ${BOT}.`); return false; }
+    if(p && p.solo && c.id!==p.solo){ toast(`Buscá ${(REMEDIOS[p.solo]||ESPANTOS[p.solo]).nombre}.`); return false; }
+  }
   if(S.fase==="ataque" && c.t!=="e"){ toast("En tu turno se lanzan espantos: las cartas rojas."); return false; }
   if(S.fase==="defensa" && c.t!=="r"){ toast("Para defenderte usá un remedio: las cartas claras."); return false; }
   return true;
@@ -728,6 +788,7 @@ function tocar(uid){
   } else { S.sel=uid; Sonido.play("tick"); render(); }
 }
 async function accionCambiar(){
+  if(S.tuto){ toast("En el tutorial no hace falta cambiar cartas."); return; }
   if(!miAccion() || S.fase!=="ataque" || S.sel==null) return;
   const uid=S.sel, el=document.querySelector(`#abanico .carta[data-uid="${uid}"]`); if(!el) return;
   ocupado=true;
@@ -763,7 +824,8 @@ async function botAtaque(){
     botCorriendo=false; cambiar(c.uid); soltarVuelo(g); return;
   }
   esp.sort((a,b)=>ESPANTOS[b.id].poder-ESPANTOS[a.id].poder);
-  const c=Math.random()<.6 ? esp[0] : esp[Math.floor(Math.random()*esp.length)];
+  let c=Math.random()<.6 ? esp[0] : esp[Math.floor(Math.random()*esp.length)];
+  if(S.tuto){ const g=esp.find(x=>x.id===TUTO_ATAQUES[S.tuto.a]); S.tuto.a++; if(g) c=g; }
   S.burbuja={t:"Escuchá esta…"}; render();
   await sleep(750); if(!vivo()){ botCorriendo=false; return; }
   const g=await volar(cartaHTML(c), rivalOrigen(), $("#slotE").getBoundingClientRect(), {flip:true,rot1:-5,dur:640});
@@ -776,6 +838,12 @@ async function botDefensa(){
   const p=S.players[1], e=ESPANTOS[S.ataque.id], rems=p.mano.filter(c=>c.t==="r");
   const ok=rems.find(c=>c.id===e.remedio), ros=rems.find(c=>c.id==="rosario");
   let pick=null;
+  if(S.tuto){
+    const id=TUTO_DEF[S.tuto.d++]; pick=id ? rems.find(c=>c.id===id)||null : null;
+    if(pick){ const g=await volar(cartaHTML(pick), rivalOrigen(), $("#slotR").getBoundingClientRect(), {flip:true,rot1:7,dur:640}); botCorriendo=false; resolver(pick.uid); soltarVuelo(g); }
+    else { botCorriendo=false; resolver(null); }
+    return;
+  }
   if(ok && Math.random()<BOT_ACIERTO) pick=ok;
   else if(ros && e.poder>=3) pick=ros;
   else if(Math.random()<.35){ const malos=rems.filter(c=>c.id!==e.remedio && c.id!=="rosario"); if(malos.length) pick=malos[Math.floor(Math.random()*malos.length)]; }
@@ -788,7 +856,7 @@ async function botDefensa(){
 /* ---------- vistas ---------- */
 function cartaHTML(c,{boton=false,cls="",estilo=""}={}){
   const e=c.t==="e", d=e?ESPANTOS[c.id]:REMEDIOS[c.id], tag=boton?"button":"div";
-  return `<${tag} ${boton?'type="button"':""} class="carta ${e?"e":"r"} ${cls}" data-uid="${c.uid??""}" ${estilo?`style="${estilo}"`:""} aria-label="${esc(d.nombre)}${e?`, susto ${d.poder}`:", remedio"}">`+
+  return `<${tag} ${boton?'type="button"':""} class="carta ${e?"e":"r"} ${cls}" data-uid="${c.uid??""}" data-id="${c.id}" ${estilo?`style="${estilo}"`:""} aria-label="${esc(d.nombre)}${e?`, susto ${d.poder}`:", remedio"}">`+
     (ARTE.has(c.id)?`<img class="arte" src="arte/${c.id}.jpg" alt="" draggable="false">`:`<span class="ini" aria-hidden="true">${esc(inicial(d.nombre))}</span>`)+
     (e?`<span class="pod" aria-hidden="true">${d.poder}</span>`:`<span class="tipo" aria-hidden="true">Remedio</span>`)+
     `<span class="nom" aria-hidden="true">${esc(d.nombre)}</span></${tag}>`;
@@ -874,7 +942,7 @@ function juegoHTML(){
         <div class="avatar ${act===r?"activo":""}" aria-hidden="true">${esc(inicial(riv.nombre))}</div>
         <div class="rival-info"><span class="etiqueta">${esc(riv.nombre)}</span><div id="rivalMano" class="rival-mano" aria-label="${riv.mano.length} cartas">${riv.mano.map(()=>'<div class="dorso mini"></div>').join("")}</div></div>
       </div>
-      ${S.burbuja && !S.telon ? `<div class="burbuja" aria-live="polite"><b>${esc(S.burbuja.t)}</b>${S.burbuja.x?esc(S.burbuja.x):""}</div>`:""}
+      ${S.burbuja && !S.telon && !S.tuto ? `<div class="burbuja" aria-live="polite"><b>${esc(S.burbuja.t)}</b>${S.burbuja.x?esc(S.burbuja.x):""}</div>`:""}
       <div id="slotE" class="slot ${guiaE?"guia":""}">${S.ataque?cartaHTML(S.ataque,{cls:clsE}):""}</div>
       <div id="slotR" class="slot ${guiaR?"guia":""}">${S.defensa?cartaHTML(S.defensa,{cls:clsR}):""}</div>
       ${sello}${info}
@@ -897,13 +965,14 @@ function portadaHTML(){
     ${instalarHTML()}
     ${enCurso?`<button class="btn prim" data-act="seguir-partida">Seguir la partida</button>`:""}
     <label for="j1">Tu nombre<input id="j1" maxlength="14" placeholder="Rober" value="${esc(n1)}"></label>
-    <button class="btn ${enCurso?"":"prim"}" data-act="iniciar-bot">Jugar contra ${BOT}</button>
+    ${PREF.tutoHecho ? "" : `<button class="btn ${enCurso?"":"prim"}" data-act="tuto">Primera vez: ${BOT} te enseña</button>`}
+    <button class="btn ${enCurso||!PREF.tutoHecho?"":"prim"}" data-act="iniciar-bot">Jugar contra ${BOT}</button>
     <div class="fila" style="align-items:end">
       <label for="j2">Segundo jugador<input id="j2" maxlength="14" placeholder="Jesi" value="${esc(n2)}"></label>
       <button class="btn" data-act="iniciar-dos">Dos en un celu</button>
     </div>
     <div class="fila"><button class="btn chico" data-act="sonido" aria-pressed="${PREF.sonido}">Sonido: ${PREF.sonido?"sí":"no"}</button><button class="btn chico" data-act="sustos" aria-pressed="${PREF.sustos}">Sustos fuertes: ${PREF.sustos?"sí":"no"}</button></div>
-    <div class="fila"><button class="vinc" data-act="ver" data-v="reglas">Cómo se juega</button><button class="vinc" data-act="ver" data-v="bestiario">Bestiario</button></div>
+    <div class="fila"><button class="vinc" data-act="ver" data-v="reglas">Cómo se juega</button>${PREF.tutoHecho?`<button class="vinc" data-act="tuto">Repetir el tutorial</button>`:""}<button class="vinc" data-act="ver" data-v="bestiario">Bestiario</button></div>
   </div>`;
 }
 function reglasHTML(){
@@ -922,6 +991,8 @@ function reglasHTML(){
     </ol>
     <p class="aviso">Podés ordenar tu mano arrastrando las cartas de costado. Tocá cualquier carta para leer su leyenda antes de jugarla.</p>
     <p class="aviso">Cada espanto indica si su remedio viene de la tradición o si es una regla del juego. Cuando la tradición no fija un remedio, el juego lo dice.</p>
+    <h2>Créditos</h2>
+    <p class="sub">Ilustraciones y logo generados con Gemini. Sonidos de Freesound (martinsadoux, amoel46747, soundsforhim, ritola27, craigsmith, tommasomotteran, lauracarolina09) y de Pixabay (Dragon Studio, gsmsea, freesound_community, bluegraya10). Leyendas recopiladas de la tradición oral argentina.</p>
   </div>`;
 }
 function bestiarioHTML(){
@@ -963,6 +1034,7 @@ function render(){
     app.innerHTML = S.vista==="reglas" ? reglasHTML() : S.vista==="bestiario" ? bestiarioHTML() : portadaHTML();
     window.scrollTo(0,0);
   }
+  coach();
 }
 function toast(msg){
   const t=$("#toast"); if(!t) return;
@@ -1036,11 +1108,96 @@ document.addEventListener("click",e=>{
   else if(a==="telon") levantarTelon();
   else if(a==="jugar"){ if(S.sel!=null) jugarEl(S.sel); }
   else if(a==="cambiar") accionCambiar();
-  else if(a==="aguantar"){ if(miAccion() && S.fase==="defensa") resolver(null); }
+  else if(a==="aguantar"){ if(S.tuto && PASOS[S.tuto.i]?.solo){ toast(`Esta vez usá ${REMEDIOS[PASOS[S.tuto.i].solo].nombre}.`); return; } if(miAccion() && S.fase==="defensa") resolver(null); }
+  else if(a==="tuto"){ const [n1]=nombres(); iniciarTuto(n1); }
+  else if(a==="coach"){ avanzarCoach(); }
+  else if(a==="coach-salir"){ terminarTuto(false); }
   else if(a==="seguir"){ if(!ocupado) seguir(); }
   else if(a==="revancha"){ iniciar(S.modo,S.players[0].nombre,S.players[1].nombre); }
 });
-addEventListener("resize",()=>acomodarAbanico());
+addEventListener("resize",()=>{ acomodarAbanico(); posicionarCoach(); });
+
+/* ---------- tutorial: Don Ceferino te enseña ---------- */
+const TUTO_MANO_J=["futre","viuda","punal","rosario","tabaco"], TUTO_MANO_B=["familiar","lobizon","fuego","calafate","mulanima"];
+const TUTO_ATAQUES=["familiar","lobizon"], TUTO_DEF=["fuego",null];
+const selId=()=>{ const c=S.sel!=null && S.players[0].mano.find(x=>x.uid===S.sel); return c?c.id:null; };
+const enRes=()=>S.fase==="resultado" && !S.sustoPend;
+const PASOS=[
+  {txt:"¡Buenas noches! ¿Primera vez en esta mesa? Sentate, que te enseño a jugar. Es un ratito.", btn:"Dale"},
+  {t:[".top .marca:not(.der)"], txt:"Esas velitas son tu coraje. Cada susto te apaga algunas. Si se te apagan todas, perdiste la noche. Las mías están a la derecha.", btn:"Entendido"},
+  {t:['#abanico'], txt:"Esta es tu mano. Las cartas rojas son espantos y las claras, remedios. Tocá El Futre para leer su leyenda.", hasta:()=>selId()==="futre"||!!S.ataque},
+  {t:[".mesa .info"], txt:"Cada carta trae su leyenda y de qué provincia es. El número rojo es el susto: cuántas velas apaga si no lo frenan.", btn:"Sigamos"},
+  {t:['#abanico .carta[data-id="futre"]','#slotE'], txt:"Ahora tirámelo: arrastralo hacia la mesa o tocalo otra vez.", hasta:()=>!!S.ataque, solo:"futre"},
+  {espera:enRes, t:[".hoja"], arriba:true, txt:"¡Me agarraste! Al Futre se lo calma con un rezo, y yo tiré fuego. Pierdo 2 velas. Abajo siempre te explico qué lo frenaba. Tocá Seguir.", hasta:()=>!S.res},
+  {espera:()=>S.fase==="defensa"&&S.turno===1, t:["#slotE",'#abanico .carta[data-id="punal"]'], txt:"Ahora defendete. Te tiré El Familiar, el perro del diablo de los ingenios: solo retrocede ante la cruz que forma el cabo de un puñal. Tirá el Puñal a la mesa.", hasta:()=>!!S.defensa||!!S.res, solo:"punal"},
+  {espera:enRes, t:[".hoja"], arriba:true, txt:"¡Eso! Lo espantaste: no perdiste ninguna vela y te ganaste una carta de premio. Tocá Seguir.", hasta:()=>!S.res},
+  {espera:()=>S.fase==="ataque"&&S.turno===0&&!S.ataque, t:['#abanico .carta[data-id="viuda"]','#slotE'], txt:"Te toca lanzar a vos. Tirale La Viuda a este viejo.", hasta:()=>!!S.ataque, solo:"viuda"},
+  {espera:enRes, t:[".hoja"], arriba:true, txt:"No tenía con qué frenarla, así que me aguanté el susto. Vos también podés aguantar cuando no tenés el remedio. Tocá Seguir.", hasta:()=>!S.res},
+  {espera:()=>S.fase==="defensa"&&S.turno===1, t:["#slotE",'#abanico .carta[data-id="rosario"]'], txt:"Al Lobizón lo frena una bala bendecida, y no tenés. Pero el Rosario sirve contra cualquier espanto: te cubre la mitad del susto. Tiralo.", hasta:()=>!!S.defensa||!!S.res, solo:"rosario"},
+  {espera:enRes, t:[".hoja"], arriba:true, txt:()=>PREF.sustos?"¡Te asusté! Cuando te pega un espanto de 3 o más, viene un susto fuerte. Con el rosario perdiste 2 velas en vez de 4. Si los sustos no te gustan, se apagan en la portada.":"Con el rosario perdiste 2 velas en vez de 4.", btn:"Entendido"},
+  {txt:"Ya sabés todo lo que hace falta. Ahora jugamos en serio, y no te voy a tener piedad.", btn:"Jugar en serio", fin:true}
+];
+let coachT=null;
+function iniciarTuto(n1){
+  S=nuevoEstado(n1,BOT,"bot"); S.mazo=armarMazo();
+  const tomar=(p,id)=>{ const i=S.mazo.findIndex(c=>c.id===id); const [c]=S.mazo.splice(i,1); S.players[p].mano.push(c); S.nuevas.push(c.uid); };
+  TUTO_MANO_J.forEach(id=>tomar(0,id)); TUTO_MANO_B.forEach(id=>tomar(1,id));
+  S.tuto={i:0,a:0,d:0,visto:-1}; S.vista="juego"; S.enJuego=true; S.turno=0;
+  comenzarTurno();
+}
+function terminarTuto(jugar=true){
+  PREF.tutoHecho=true; guardarPref();
+  const el=$("#coach"); if(el) el.hidden=true;
+  const n=S.players[0].nombre;
+  if(jugar) iniciar("bot",n,BOT); else { S.tuto=null; S.vista="portada"; S.enJuego=false; render(); }
+}
+function avanzarCoach(){
+  const p=S && S.tuto && PASOS[S.tuto.i]; if(!p) return;
+  if(p.fin){ terminarTuto(true); return; }
+  S.tuto.i++; coach();
+}
+function coach(){
+  let el=$("#coach");
+  const activo=S && S.tuto && S.vista==="juego" && !S.telon;
+  if(!activo){ if(el) el.hidden=true; return; }
+  let p;
+  for(;;){
+    p=PASOS[S.tuto.i]; if(!p) break;
+    if(S.tuto.visto===S.tuto.i && p.hasta && p.hasta()){ S.tuto.i++; continue; }
+    break;
+  }
+  if(!p || S.sustoPend || document.querySelector(".susto") || (p.espera && !p.espera())){ if(el) el.hidden=true; return; }
+  S.tuto.visto=S.tuto.i;
+  if(!el){
+    el=document.createElement("div"); el.id="coach";
+    el.innerHTML=`<div class="coach-hueco"></div><div class="coach-globo" role="dialog" aria-label="Tutorial"><div class="coach-quien"><span class="avatar" aria-hidden="true">C</span>${esc(BOT)}<span class="coach-paso"></span></div><p class="coach-txt" aria-live="polite"></p><div class="coach-pie"><button class="vinc" data-act="coach-salir">Saltear</button><button class="btn prim coach-btn" data-act="coach"></button></div></div>`;
+    document.body.appendChild(el);
+  }
+  el.hidden=false;
+  el.querySelector(".coach-txt").textContent=typeof p.txt==="function"?p.txt():p.txt;
+  el.querySelector(".coach-paso").textContent=`${S.tuto.i+1} de ${PASOS.length}`;
+  const b=el.querySelector(".coach-btn"); b.hidden=!p.btn; b.textContent=p.btn||"";
+  el.querySelector('[data-act="coach-salir"]').hidden=!!p.fin;
+  posicionarCoach();
+  clearTimeout(coachT); coachT=setTimeout(posicionarCoach,1150);
+}
+function posicionarCoach(){
+  const el=$("#coach"); if(!el || el.hidden || !S || !S.tuto) return;
+  const p=PASOS[S.tuto.i]; if(!p) return;
+  const h=el.querySelector(".coach-hueco"), g=el.querySelector(".coach-globo");
+  const rs=(p.t||[]).map(q=>document.querySelector(q)).filter(Boolean).map(x=>x.getBoundingClientRect()).filter(r=>r.width>0);
+  let r=null;
+  if(rs.length){ const L=Math.min(...rs.map(x=>x.left)), T=Math.min(...rs.map(x=>x.top)), R=Math.max(...rs.map(x=>x.right)), B=Math.max(...rs.map(x=>x.bottom)); r={left:L,top:T,right:R,bottom:B,width:R-L,height:B-T}; }
+  const pad=8;
+  if(r){ Object.assign(h.style,{left:r.left-pad+"px",top:r.top-pad+"px",width:r.width+pad*2+"px",height:r.height+pad*2+"px"}); h.classList.add("foco"); }
+  else { Object.assign(h.style,{left:innerWidth/2+"px",top:innerHeight/2+"px",width:"0px",height:"0px"}); h.classList.remove("foco"); }
+  const gh=g.offsetHeight, H=innerHeight; let top;
+  if(!r) top=(H-gh)/2;
+  else if(p.arriba) top=12;
+  else if(r.top+r.height/2>H/2) top=r.top-pad-14-gh;
+  else top=r.bottom+pad+14;
+  g.style.top=Math.max(12,Math.min(H-gh-12,top))+"px";
+}
 
 /* ---------- inicio e instalación ---------- */
 (function(){
